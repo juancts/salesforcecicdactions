@@ -6,7 +6,7 @@ on:
   
   pull_request:
     types:[opened, synchronize]
-    branches: [ "dev" ]
+    branches: [ dev ]
 
   paths:
     - 'force-app/**'
