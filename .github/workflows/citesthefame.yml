@@ -13,17 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.actor != 'dependabot[bot]' }}
     steps:
-      - name: 'install node'
+      - name: install node
         uses: actions/setup-node@v3
         with:
           node-version: '14'
 
-      - name: 'Checkout source code'
+      - name: Checkout source code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: 'Read PR Body'
+      - name: Read PR Body
         env:
           PR_BODY: ${{github.event.pull_request.body}}
         run: |
@@ -32,33 +32,33 @@ jobs:
           TESTS=$(cat testsToRun.txt)
           echo "APEX_TESTS=$TESTS" >> $GITHUB_ENV
 
-      - name: 'Installing sfdx git delta'
+      - name: Installing sfdx git delta
         run: | 
           echo y | sfdx plugins:install sfdx-git-delta
           sfdx plugins
 
-      - name: 'Installing java'
+      - name: Installing java
         run: |
           sudo apt-get update
           sudo apt install default-jdk
 
-      - name: 'Installing SFDX scanner'
+      - name: Installing SFDX scanner
         run: sfdx plugins:install @salesforce/sfdx-scanner
 
-      - name: 'Populate auth file with SFDX_URL secret of integration org'
+      - name: Populate auth file with SFDX_URL secret of integration org
         shell: bash
         run: |
           echo ${{ secrets.SFDX_INTEGRATION_URL}} > ./SFDX_INTEGRATION_URL.txt
 
-      - name: 'Authenticate to Integration Org'
+      - name: Authenticate to Integration Org
         run: sfdx auth:sfdxurl:store -f ./SFDX_INTEGRATION_URL.txt -s -a integration
 
-      - name: 'Create delta packages for new, modified or deleted metadata'
+      - name: Create delta packages for new, modified or deleted metadata
         run: | 
           mkdir changed-sources
           sfdx sgd:source:delta --to "HEAD" --from "HEAD^" --output changed-sources/ --generate-delta --source force-app/
 
-      - name: 'Scan code'
+      - name: Scan code
         run: |
           cd changed-sources
           sfdx scanner:run --format sarif --target './**/*.cls' --category "Design,Best Practices,Performance" --outfile 'apexScanResults.sarif'  
@@ -69,14 +69,14 @@ jobs:
         with:
           sarif_file: changed-sources/apexScanResults.sarif
 
-      - name: 'Check-only deploy delta changes - run specified tests'
+      - name: Check-only deploy delta changes - run specified tests
         if: ${{ env.APEX_TESTS != 'all' }}
         run: |
           echo ${{env.APEX_TESTS}}
           sfdx force:source:deploy -p "changed-sources/force-app" --checkonly --testlevel RunSpecifiedTests --runtests ${{env.APEX_TESTS}} --json
 
-      - name: 'Check-only deploy delta changes - run specified tests'
+      - name: Check-only deploy delta changes - run specified tests
         if: ${{ env.APEX_TESTS != 'all' }}
         run: |
           echo ${{env.APEX_TESTS}}
-          sfdx force:source:deploy -
+          sfdx force:source:deploy - -d "changed-sources/destructiveChanges" --checkonly --ignorewarnings
