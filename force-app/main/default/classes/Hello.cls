@@ -7,6 +7,7 @@
 **/
 public with sharing class Hello {
         public static string test(){
+            system.debug('hello world');
             string totest = 'hello';
             return totest;
         }
