@@ -3,7 +3,6 @@
 name: Validate PR on develop branch
 
 on:
-  
   pull_request:
   types: [opened, synchronize]
   branches:
