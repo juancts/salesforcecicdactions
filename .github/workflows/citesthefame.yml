@@ -16,7 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.actor != 'dependabot[bot]' }}
     steps:
-      - uses: actions/setup-node@v3
+      - name: 'install node'
+        uses: actions/setup-node@v3
         with:
           node-version: '14'
 
