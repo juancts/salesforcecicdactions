@@ -3,13 +3,13 @@
 name: Validate PR on develop branch
 
 on:
-  
   pull_request:
-    types:[opened, synchronize]
-    branches: [ dev ]
+  types: [opened, synchronize, edited, reopened, ready_for_review]
+  branches:
+    - dev
 
   paths:
-    - 'force-app/**'
+    - "force-app/**"
 
 jobs:
   validate-deployment-on-dev-org:
