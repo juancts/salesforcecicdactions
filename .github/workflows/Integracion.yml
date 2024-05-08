@@ -1,0 +1,42 @@
+name: Deploy Integración
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "force-app/**"
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    container: ntsseidor/salesforcedx:salto
+    permissions:
+      contents: read
+    env:
+      CI_GITHUB_TOKEN: ${{ secrets.GHUB_TOKEN }}
+      AUTH_URL: ${{ secrets.SFDX_INTEGRATION_URL }}
+      DEPLOY_MODE: ${{ vars.DEPLOY_MODE }}
+      APEX_TEST_LEVEL: ${{ vars.APEX_TEST_LEVEL }}
+      APEX_SPECIFIED_TESTS: ${{ vars.APEX_SPECIFIED_TESTS }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'npm'
+        # env:
+        #   GITHUB_SHA: ${{github.sha}}  
+      - name: Deploy to Salesforce
+        run: | 
+          npm ci --ignore-scripts
+          export SFDX_DISABLE_DNS_CHECK=true
+          export HOME=/root          
+          node scripts/source/auth.js dev
+          node scripts/source/deploy.js target_org origin/main~1 FULL false RunLocalTests

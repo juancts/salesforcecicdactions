@@ -1,0 +1,100 @@
+name: PR UAT
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened, ready_for_review]
+    branches:
+      - uat
+    paths:
+      - "force-app/**"
+
+concurrency:
+  group: dev-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-validation:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    container: ntsseidor/salesforcedx:salto
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'npm'
+      - name: LWC Validation
+        run: |
+          npm ci --ignore-scripts
+          npm run test:lwc
+    #   - name: Get Changed Files For Code Scanner
+    #     id: changed-files
+    #     uses: tj-actions/changed-files@v39
+    #     with:
+    #       files: |
+    #         **.cls
+    #         **.js
+    #       separator: ","
+    #   - name: Code Scanner
+    #     run: |
+    #       export HOME=/root
+    #       if [ -d "scan-results" ]; then rm -Rf "scan-results"; fi ; mkdir scan-results
+    #       sfdx scanner run --target ${{ steps.changed-files.outputs.all_changed_files}} --outfile scan-results/scanner.xml --format junit
+    #   - name: Publish Scanner Results
+    #     uses: mikepenz/action-junit-report@v3
+    #     with:
+    #       check_name: Code Scanner Results
+    #       report_paths: "**/scan-results/scanner.xml"
+    # continue-on-error: true
+
+  validate-integracion:
+    needs: local-validation
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    container: ntsseidor/salesforcedx:salto
+    permissions:
+      contents: read
+      issues: read
+      checks: write
+      pull-requests: write
+    env:
+      CI_GITHUB_TOKEN: ${{secrets.GHUB_TOKEN}}
+      AUTH_URL: ${{ secrets.SFDX_INTEGRATION_URL }}
+      DEPLOY_MODE: ${{ vars.VALIDATION_DEPLOY_MODE }}
+      APEX_TEST_LEVEL: ${{ vars.VALIDATION_APEX_TEST_LEVEL }}
+      APEX_SPECIFIED_TESTS: ${{ vars.VALIDATION_APEX_SPECIFIED_TESTS }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'npm'
+      - name: Extract branch name
+        shell: bash
+        run: |
+          echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+      - name: Validate to Salesforce
+        run: |
+          npm ci --ignore-scripts
+          export SFDX_DISABLE_DNS_CHECK=true
+          export HOME=/root
+          node scripts/source/auth.js dev
+          node scripts/source/deploy.js target_org integracion FULL true RunLocalTests
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: env.APEX_TEST_LEVEL != 'NoTestRun'
+        with:
+          check_name: "Test Results"
+          files: "test-reports/junit/junit.xml"
+        continue-on-error: true
